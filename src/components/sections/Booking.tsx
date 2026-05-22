@@ -20,21 +20,18 @@ const units: Unit[] = [
     name: "PlayStation 1",
     price: 150,
     group: "Retro Console",
-    conflictsWith: ["ps2"],
   },
   {
     id: "ps2",
     name: "PlayStation 2",
     price: 150,
     group: "Retro Console",
-    conflictsWith: ["ps1"],
   },
   {
     id: "ps3",
     name: "PlayStation 3",
     price: 150,
     group: "Console",
-    conflictsWith: ["ps5", "ps5_sim"],
   },
   { id: "ps4", name: "PlayStation 4", price: 150, group: "Console" },
   {
@@ -42,14 +39,14 @@ const units: Unit[] = [
     name: "PlayStation 5",
     price: 200,
     group: "Console · 1 PS5 with inbuilt simulator",
-    conflictsWith: ["ps5_sim", "ps3"],
+    conflictsWith: ["ps5_sim"],
   },
   {
     id: "ps5_sim",
     name: "PS5 Racing Simulator",
     price: 250,
     group: "Simulator · attached to the PS5",
-    conflictsWith: ["ps5", "ps3"],
+    conflictsWith: ["ps5"],
   },
   { id: "ps4_vr", name: "PS4 VR Headset", price: 250, group: "Virtual Reality" },
 ];
@@ -62,7 +59,10 @@ const slotHour = (s: string) => Number(s.split(":")[0]);
 const maxHoursFromSlot = (s: string) => Math.max(1, Math.min(6, CLOSE_HOUR - slotHour(s)));
 
 const format12Hour = (s: string) => {
-  const [hourStr, minStr] = s.split(":");
+  if (!s) return "—";
+  const parts = s.split(":");
+  if (parts.length < 2) return "—";
+  const [hourStr, minStr] = parts;
   const hour = Number(hourStr);
   const ampm = hour >= 12 ? "PM" : "AM";
   const hour12 = hour % 12 || 12;
@@ -80,7 +80,7 @@ export function Booking() {
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
   const [unitId, setUnitId] = useState(units[0].id);
-  const [slot, setSlot] = useState(slots[2]);
+  const [slot, setSlot] = useState("");
   const [hours, setHours] = useState(1);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -126,7 +126,7 @@ export function Booking() {
   const now = new Date();
   const isToday = date === today;
   const isSlotPast = (s: string) => {
-    if (!isToday) return false;
+    if (!s || !isToday) return false;
     const [h, m] = s.split(":").map(Number);
     const t = new Date();
     t.setHours(h, m, 0, 0);
@@ -136,6 +136,7 @@ export function Booking() {
   // A unit slot is taken if THIS unit OR any conflicting unit (e.g. PS5↔PS5 sim) is booked then.
   const isBooked = useCallback(
     (uId: string, s: string) => {
+      if (!s) return false;
       const u = units.find((x) => x.id === uId)!;
       const watch = new Set<string>([uId, ...(u.conflictsWith ?? [])]);
       const startH = slotHour(s);
@@ -171,10 +172,11 @@ export function Booking() {
   const slotPast = isSlotPast(slot);
 
   const price = useMemo(() => unit.price * hours, [unit, hours]);
-  const endTime = `${String(slotHour(slot) + hours).padStart(2, "0")}:00`;
+  const endTime = slot ? `${String(slotHour(slot) + hours).padStart(2, "0")}:00` : "";
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!slot) return setError("Please select a time slot first.");
     setError(null);
     if (slotPast) return setError("That slot has already passed.");
     if (slotBlocked) return setError("Already booked for this time. Pick another slot.");
@@ -305,7 +307,7 @@ export function Booking() {
                       onClick={() => setHours(h)}
                       className={`min-w-[44px] rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-widest transition-all duration-300 ease-out will-change-transform ${
                         hours === h
-                          ? "bg-gradient-to-r from-neon-cyan to-neon-pink text-primary-foreground scale-[1.04]"
+                          ? "bg-neon-cyan text-primary-foreground shadow-[0_0_20px_color-mix(in_oklab,var(--neon-cyan)_50%,transparent)] scale-[1.04]"
                           : "border border-white/10 text-muted-foreground hover:-translate-y-0.5 hover:border-white/30 hover:text-foreground"
                       }`}
                     >
@@ -314,7 +316,7 @@ export function Booking() {
                   ))}
                 </div>
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  Ends at {format12Hour(endTime)} · arena closes at 10:00 PM
+                  {slot ? `Ends at ${format12Hour(endTime)} · ` : ""}arena closes at 10:00 PM
                 </p>
               </Field>
             </div>
@@ -340,7 +342,7 @@ export function Booking() {
                           : taken
                             ? "cursor-not-allowed border border-neon-pink/40 bg-neon-pink/10 text-neon-pink/70"
                             : slot === s
-                              ? "bg-gradient-to-r from-neon-cyan to-neon-pink text-primary-foreground scale-[1.02]"
+                              ? "bg-neon-cyan text-primary-foreground shadow-[0_0_20px_color-mix(in_oklab,var(--neon-cyan)_50%,transparent)] scale-[1.02]"
                               : "border border-white/10 text-muted-foreground hover:-translate-y-0.5 hover:border-white/30 hover:text-foreground"
                       }`}
                       title={taken ? "Already booked at this time" : undefined}
@@ -385,10 +387,20 @@ export function Booking() {
             )}
 
             <a
-              href={waHref}
-              target="_blank"
+              href={slot ? waHref : "#"}
+              onClick={(e) => {
+                if (!slot) {
+                  e.preventDefault();
+                  setError("Please select a time slot first.");
+                }
+              }}
+              target={slot ? "_blank" : undefined}
               rel="noreferrer"
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-neon-cyan/40 bg-neon-cyan/5 px-6 py-3 font-display text-xs font-bold uppercase tracking-widest text-neon-cyan transition-all hover:bg-neon-cyan/10"
+              className={`flex w-full items-center justify-center gap-2 rounded-xl border px-6 py-3 font-display text-xs font-bold uppercase tracking-widest transition-all ${
+                slot
+                  ? "border-neon-cyan/40 bg-neon-cyan/5 text-neon-cyan hover:bg-neon-cyan/10"
+                  : "border-white/10 bg-white/5 text-muted-foreground/50 cursor-not-allowed"
+              }`}
             >
               <MessageCircle className="h-4 w-4" /> Or book on WhatsApp
             </a>
@@ -417,7 +429,7 @@ export function Booking() {
                 <h3 className="mt-2 font-display text-2xl font-bold">{unit.name}</h3>
                 <ul className="mt-6 space-y-3 text-sm">
                   <Row k="Date" v={date} />
-                  <Row k="Slot" v={`${format12Hour(slot)} → ${format12Hour(endTime)}`} />
+                  <Row k="Slot" v={slot ? `${format12Hour(slot)} → ${format12Hour(endTime)}` : "Select a slot"} />
                   <Row k="Duration" v={`${hours} hr`} />
                   <Row k="Pay at arena" v="On arrival" />
                 </ul>
