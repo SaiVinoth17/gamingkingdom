@@ -429,7 +429,10 @@ export function Booking() {
                 <h3 className="mt-2 font-display text-2xl font-bold">{unit.name}</h3>
                 <ul className="mt-6 space-y-3 text-sm">
                   <Row k="Date" v={date} />
-                  <Row k="Slot" v={slot ? `${format12Hour(slot)} → ${format12Hour(endTime)}` : "Select a slot"} />
+                  <Row
+                    k="Slot"
+                    v={slot ? `${format12Hour(slot)} → ${format12Hour(endTime)}` : "Select a slot"}
+                  />
                   <Row k="Duration" v={`${hours} hr`} />
                   <Row k="Pay at arena" v="On arrival" />
                 </ul>
